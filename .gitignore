@@ -86,3 +86,4 @@ lint/tmp/
 
 #Properties file
 github.properties
+.idea

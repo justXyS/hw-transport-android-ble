@@ -261,6 +261,8 @@ class BleServiceStateMachine(
         services.forEach { service ->
             if (service.uuid == BleManager.NANO_X_SERVICE_UUID.toUUID()
                 || service.uuid == BleManager.STAX_SERVICE_UUID.toUUID()
+                || service.uuid == BleManager.FLEX_SERVICE_UUID.toUUID()
+                || service.uuid == BleManager.GEN5_SERVICE_UUID.toUUID()
             ) {
                 Timber.d("Service UUID ${service.uuid}")
 
@@ -269,15 +271,21 @@ class BleServiceStateMachine(
                 service.characteristics.forEach { characteristic ->
                     when (characteristic.uuid) {
                         BleManager.nanoXWriteWithResponseCharacteristicUUID.toUUID(),
-                        BleManager.staxWriteWithResponseCharacteristicUUID.toUUID() -> {
+                        BleManager.staxWriteWithResponseCharacteristicUUID.toUUID(),
+                        BleManager.flexWriteWithResponseCharacteristicUUID.toUUID(),
+                        BleManager.gen5WriteWithResponseCharacteristicUUID.toUUID() -> {
                             bleServiceBuilder.setWriteCharacteristic(characteristic)
                         }
                         BleManager.nanoXWriteWithoutResponseCharacteristicUUID.toUUID(),
-                        BleManager.staxWriteWithoutResponseCharacteristicUUID.toUUID() -> {
+                        BleManager.staxWriteWithoutResponseCharacteristicUUID.toUUID(),
+                        BleManager.flexWriteWithoutResponseCharacteristicUUID.toUUID(),
+                        BleManager.gen5WriteWithoutResponseCharacteristicUUID.toUUID() -> {
                             bleServiceBuilder.setWriteNoAnswerCharacteristic(characteristic)
                         }
                         BleManager.nanoXNotifyCharacteristicUUID.toUUID(),
-                        BleManager.staxNotifyCharacteristicUUID.toUUID() -> {
+                        BleManager.staxNotifyCharacteristicUUID.toUUID(),
+                        BleManager.flexNotifyCharacteristicUUID.toUUID(),
+                        BleManager.gen5NotifyCharacteristicUUID.toUUID() -> {
                             bleServiceBuilder.setNotifyCharacteristic(characteristic)
                         }
                     }
