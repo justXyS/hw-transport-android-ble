@@ -111,7 +111,7 @@ class BleManager internal constructor(
                 //Not called
                 ScanSettings.CALLBACK_TYPE_MATCH_LOST -> {
                     Timber.d("Scan result => Lost")
-                    if (scannedDevices.removeIf { it.id == result.device.address }) {
+                    if (scannedDevices.removeAll { it.id == result.device.address }) {
                         onScanDevicesCallback?.invoke(scannedDevices)
                     }
                 }
@@ -260,6 +260,7 @@ class BleManager internal constructor(
     @Synchronized
     fun connect(
         address: String,
+        serviceId: String? = null,
         onConnectSuccess: (BleDeviceModel) -> Unit,
         onConnectError: (BleError) -> Unit,
     ) {
@@ -279,7 +280,7 @@ class BleManager internal constructor(
             || connectingJob?.isCompleted == true
         ) {
             connectingJob = scope.launch {
-                internalConnect(address, callback)
+                internalConnect(address, serviceId, callback)
             }
         }
     }
@@ -287,20 +288,21 @@ class BleManager internal constructor(
     /**
      * Use Event Flow for connection callback
      */
-    @Synchronized
-    fun connect(address: String) {
-        if (connectingJob == null
-            || connectingJob?.isCancelled == true
-            || connectingJob?.isCompleted == true
-        ) {
-            connectingJob = scope.launch {
-                internalConnect(address)
-            }
-        }
-    }
+//    @Synchronized
+//    fun connect(address: String) {
+//        if (connectingJob == null
+//            || connectingJob?.isCancelled == true
+//            || connectingJob?.isCompleted == true
+//        ) {
+//            connectingJob = scope.launch {
+//                internalConnect(address)
+//            }
+//        }
+//    }
 
     private suspend fun internalConnect(
         address: String,
+        serviceId: String? = null,
         callback: BleManagerConnectionCallback? = null,
     ) {
         Timber.d("($this) - Try Connecting to device with address $address")
@@ -308,19 +310,26 @@ class BleManager internal constructor(
         internalDisconnect()
 
         connectionCallback = callback
-
+        Timber.tag("internalConnect").e("开始执行internalConnect，serviceId:%s", serviceId)
         val device = scannedDevices.firstOrNull { it.id == address }
             ?: bluetoothAdapter.bondedDevices.firstOrNull {
+                Timber.e("执行bluetoothAdapter.bondedDevices")
                 it.address == address
             }?.let {
-                val serviceId = it.uuids?.first()?.uuid.toString()
+                Timber.tag("internalConnect").e("it.uuids:%s", it.uuids)
+                val tempServiceId = it.uuids?.first()?.uuid?.toString() ?: serviceId ?: ""
+                Timber.tag("internalConnect").e("serviceId:%s", tempServiceId)
+                Timber.tag("internalConnect").e("address:%s", it.address)
+                Timber.tag("internalConnect").e("name:%s", it.name)
                 BleDeviceModel(
                     id = it.address,
                     name = it.name,
-                    serviceId = serviceId,
-                    device = serviceId.toDeviceModel(),
+                    serviceId = tempServiceId,
+                    device = tempServiceId.toDeviceModel(),
                 )
             }
+
+        Timber.tag("internalConnect").e("device:%s", device?.toString())
 
         device?.let {
             connectedDevice = it
@@ -446,7 +455,12 @@ class BleManager internal constructor(
                             when (event) {
                                 is BleServiceEvent.BleDeviceConnected -> {
                                     connectionCallback?.onConnectionSuccess(connectedDevice)
-                                    _bleState.tryEmit(BleState.Connected(connectedDevice = connectedDevice, mtu = event.mtu))
+                                    _bleState.tryEmit(
+                                        BleState.Connected(
+                                            connectedDevice = connectedDevice,
+                                            mtu = event.mtu
+                                        )
+                                    )
                                 }
 
                                 is BleServiceEvent.BleDeviceDisconnected -> {
@@ -473,7 +487,7 @@ class BleManager internal constructor(
                                         }
                                 }
 
-                                is BleServiceEvent.BleServiceDisconnected ->{
+                                is BleServiceEvent.BleServiceDisconnected -> {
                                     _bleState.tryEmit(BleState.Idle)
                                 }
 
@@ -531,7 +545,8 @@ class BleManager internal constructor(
         }
     }
 
-    fun isBleSupported(): Boolean = context.packageManager.run { hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) }
+    fun isBleSupported(): Boolean =
+        context.packageManager.run { hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE) }
 
     companion object {
         private const val SCAN_MATCH_TTL = 5000L
@@ -562,12 +577,13 @@ class BleManager internal constructor(
             "13d63400-2c97-8004-0003-4c6564676572"
     }
 
-    private fun String.toDeviceModel(): BleDevice =
+    private fun String.toDeviceModel(): BleDevice? =
         when {
             equals(NANO_X_SERVICE_UUID, ignoreCase = true) -> BleDevice.NANOX
             equals(STAX_SERVICE_UUID, ignoreCase = true) -> BleDevice.STAX
             equals(FLEX_SERVICE_UUID, ignoreCase = true) -> BleDevice.FLEX
             equals(GEN5_SERVICE_UUID, ignoreCase = true) -> BleDevice.GEN5
-            else -> { throw IllegalStateException("$this is not an known uuid")}
+            else -> null
+//            else -> throw IllegalStateException("$this is not an known uuid")
         }
 }
