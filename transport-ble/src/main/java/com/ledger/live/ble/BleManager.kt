@@ -129,7 +129,7 @@ class BleManager internal constructor(
         val rssi = result.rssi
         val uuids = getServiceUUIDsList(result)
         val name = device.name
-        val serviceId = uuids.first().toString()
+        val serviceId = uuids.firstOrNull()?.toString() ?: return null
 
         return if (name != null && uuids.isNotEmpty()) {
             Timber.d("Scan result device => \n id: ${device.address} \n name: $name \n serviceId : ${uuids.first()}")
@@ -144,7 +144,7 @@ class BleManager internal constructor(
     }
 
     private fun getServiceUUIDsList(scanResult: ScanResult): List<UUID> {
-        val parcelUuids = scanResult.scanRecord!!.serviceUuids
+        val parcelUuids = scanResult.scanRecord?.serviceUuids ?: return emptyList()
         val serviceList: MutableList<UUID> = ArrayList()
         for (i in parcelUuids.indices) {
             val serviceUUID = parcelUuids[i].uuid
@@ -260,7 +260,6 @@ class BleManager internal constructor(
     @Synchronized
     fun connect(
         address: String,
-        serviceId: String? = null,
         onConnectSuccess: (BleDeviceModel) -> Unit,
         onConnectError: (BleError) -> Unit,
     ) {
@@ -280,7 +279,7 @@ class BleManager internal constructor(
             || connectingJob?.isCompleted == true
         ) {
             connectingJob = scope.launch {
-                internalConnect(address, serviceId, callback)
+                internalConnect(address, callback)
             }
         }
     }
@@ -288,21 +287,20 @@ class BleManager internal constructor(
     /**
      * Use Event Flow for connection callback
      */
-//    @Synchronized
-//    fun connect(address: String) {
-//        if (connectingJob == null
-//            || connectingJob?.isCancelled == true
-//            || connectingJob?.isCompleted == true
-//        ) {
-//            connectingJob = scope.launch {
-//                internalConnect(address)
-//            }
-//        }
-//    }
+    @Synchronized
+    fun connect(address: String) {
+        if (connectingJob == null
+            || connectingJob?.isCancelled == true
+            || connectingJob?.isCompleted == true
+        ) {
+            connectingJob = scope.launch {
+                internalConnect(address)
+            }
+        }
+    }
 
     private suspend fun internalConnect(
         address: String,
-        serviceId: String? = null,
         callback: BleManagerConnectionCallback? = null,
     ) {
         Timber.d("($this) - Try Connecting to device with address $address")
@@ -310,25 +308,8 @@ class BleManager internal constructor(
         internalDisconnect()
 
         connectionCallback = callback
-        Timber.tag("internalConnect").e("开始执行internalConnect，serviceId:%s", serviceId)
-        val device = scannedDevices.firstOrNull { it.id == address }
-            ?: bluetoothAdapter.bondedDevices.firstOrNull {
-                Timber.e("执行bluetoothAdapter.bondedDevices")
-                it.address == address
-            }?.let {
-                Timber.tag("internalConnect").e("it.uuids:%s", it.uuids)
-                val tempServiceId = it.uuids?.first()?.uuid?.toString() ?: serviceId ?: ""
-                Timber.tag("internalConnect").e("serviceId:%s", tempServiceId)
-                Timber.tag("internalConnect").e("address:%s", it.address)
-                Timber.tag("internalConnect").e("name:%s", it.name)
-                BleDeviceModel(
-                    id = it.address,
-                    name = it.name,
-                    serviceId = tempServiceId,
-                    device = tempServiceId.toDeviceModel(),
-                )
-            }
-
+        Timber.e("scannedDevices.size:%s", scannedDevices.size)
+        val device = scannedDevices.firstOrNull { it.id == address } ?: scanDeviceByAddress(address)
         Timber.tag("internalConnect").e("device:%s", device?.toString())
 
         device?.let {
@@ -338,6 +319,37 @@ class BleManager internal constructor(
         } ?: run {
             connectionCallback?.onConnectionError(BleError.DEVICE_NOT_FOUND)
             _bleEvents.tryEmit(BleEvent.Error.ConnectionError(BleError.DEVICE_NOT_FOUND))
+        }
+    }
+
+    /**
+     * 通过address搜索设备：直到扫描到这个 address 对应的设备，或者超时返回 null
+     */
+    private suspend fun scanDeviceByAddress(
+        address: String,
+        timeoutMs: Long = 20_000L
+    ): BleDeviceModel? {
+        scannedDevices.firstOrNull { it.id == address }?.let {
+            return it
+        }
+        return withTimeoutOrNull(timeoutMs) {
+            val deferred = CompletableDeferred<BleDeviceModel?>()
+            val oldCallback = onScanDevicesCallback
+            onScanDevicesCallback = { devices ->
+                oldCallback?.invoke(devices)
+                val target = devices.firstOrNull { it.id == address }
+                if (target != null && !deferred.isCompleted) {
+                    deferred.complete(target)
+                }
+            }
+
+            try {
+                internalStartScanning()
+                deferred.await()
+            } finally {
+                onScanDevicesCallback = oldCallback
+                stopScanning()
+            }
         }
     }
 
