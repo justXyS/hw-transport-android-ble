@@ -10,7 +10,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        jcenter()
        /* maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/LedgerHQ/hw-transport-android-ble")
@@ -33,4 +32,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "LiveTransportBle"
 include ':transport-ble'
-include ':bletransportsample'
+include ':tpdemo'

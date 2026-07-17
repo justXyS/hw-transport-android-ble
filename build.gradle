@@ -1,9 +1,9 @@
 buildscript {
     ext {
-        kotlin_version = '1.6.21'
-        compose_version = '1.2.0-rc02'
-        koin_version = '3.2.0'
-        ksp_version = '1.6.21-1.0.4'
+        kotlin_version = '2.4.10'
+        compose_version = '1.7.0'
+        koin_version = '3.5.0'
+        ksp_version = '2.4.10-1.0.21'
     }
 
     repositories {
@@ -12,7 +12,9 @@ buildscript {
     }
 
     dependencies {
-        classpath "com.android.tools.build:gradle:7.3.0"
+//        classpath "com.android.tools.build:gradle:7.3.0"
+        classpath 'com.android.tools.build:gradle:9.2.1'
+        classpath 'org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.2.10'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 
