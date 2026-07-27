@@ -27,9 +27,15 @@ class MainActivity : ComponentActivity() {
 
     private val ledgerBleManager by lazy { LedgerBleManager() }
     private val ledgerDevice by lazy {
+//        BleDeviceModel(
+//            "DE:F1:7D:4B:09:44",
+//            "Nano X 95D4",
+//            rssi = 0,
+//            device = null
+//        )
         BleDeviceModel(
-            "DE:F1:7D:4B:09:44",
-            "Nano X 95D4",
+            "E5:F8:E1:3E:B4:2E",
+            "Nano X 1CD2",
             rssi = 0,
             device = null
         )
@@ -74,9 +80,9 @@ class MainActivity : ComponentActivity() {
                         }
 
                         Button(onClick = {
-                            // TODO Button 3
+                            ledgerBleManager.disconnect()
                         }) {
-                            Text("Button 3")
+                            Text("断开连接")
                         }
                     }
                 }
