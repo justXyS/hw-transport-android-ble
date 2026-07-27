@@ -318,7 +318,7 @@ class BleManager internal constructor(
             context.bindService(gattServiceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
         } ?: run {
             connectionCallback?.onConnectionError(BleError.DEVICE_NOT_FOUND)
-            _bleEvents.tryEmit(BleEvent.Error.ConnectionError(BleError.DEVICE_NOT_FOUND))
+            _bleEvents.emit(BleEvent.Error.ConnectionError(BleError.DEVICE_NOT_FOUND))
         }
     }
 
@@ -478,10 +478,12 @@ class BleManager internal constructor(
                                 is BleServiceEvent.BleDeviceDisconnected -> {
                                     _bleState.tryEmit(BleState.Disconnected(event.error))
                                     disconnected(event.error)
+                                    //连接断开事件
+                                    _bleEvents.emit(BleEvent.BleStateChange.Disconnected)
                                 }
 
                                 is BleServiceEvent.SuccessSend -> {
-                                    _bleEvents.tryEmit(BleEvent.SendingEvent.SendSuccess(event.sendId))
+                                    _bleEvents.emit(BleEvent.SendingEvent.SendSuccess(event.sendId))
                                 }
 
                                 is BleServiceEvent.SendAnswer -> {
@@ -492,7 +494,7 @@ class BleManager internal constructor(
                                 }
 
                                 is BleServiceEvent.ErrorSend -> {
-                                    _bleEvents.tryEmit(BleEvent.Error.SendError(event.error))
+                                    _bleEvents.emit(BleEvent.Error.SendError(event.error))
                                     pendingSendRequest.firstOrNull { it.id == event.sendId }
                                         ?.let { callback ->
                                             callback.onError(event.error)

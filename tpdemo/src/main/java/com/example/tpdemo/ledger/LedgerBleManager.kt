@@ -10,7 +10,9 @@ import com.example.tpdemo.utils.ActivityManager
 import com.ledger.live.ble.BleManager
 import com.ledger.live.ble.BleManagerFactory
 import com.ledger.live.ble.model.BleDeviceModel
+import com.ledger.live.ble.model.BleEvent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import timber.log.Timber
@@ -25,6 +27,13 @@ class LedgerBleManager : HardwareBleManager() {
 
     //Ledger SDK封装的BleManager
     private val bleManager: BleManager = BleManagerFactory.newInstance(getContext())
+
+    //监听事件
+    private var bleEventJob: Job? = null
+
+    init {
+        observeBleEvents()
+    }
 
     /**
      * 执行
@@ -122,6 +131,24 @@ class LedgerBleManager : HardwareBleManager() {
 
     override fun isConnected(): Boolean {
         return bleManager.isConnected
+    }
+
+    /**
+     * 监听Ble事件
+     */
+    private fun observeBleEvents() {
+        bleEventJob?.cancel()
+        bleEventJob = managerScope.launch {
+            bleManager.bleEvents.collect { event ->
+                when (event) {
+                    is BleEvent.BleStateChange.Disconnected -> {
+                        Timber.e("接收到蓝牙断开事件")
+                    }
+
+                    else -> Unit
+                }
+            }
+        }
     }
 
     /**

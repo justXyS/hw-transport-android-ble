@@ -10,6 +10,7 @@ sealed class BleEvent {
         object BluetoothActivated : BleStateChange()
         object BluetoothDeactivated : BleStateChange()
         object ConnectionLost : BleStateChange()
+        object Disconnected : BleStateChange()
     }
 
     sealed class SendingEvent : BleEvent() {
@@ -19,4 +20,5 @@ sealed class BleEvent {
 
         data class SendAnswer(val id: String, val answer: String) : SendingEvent()
     }
+
 }
