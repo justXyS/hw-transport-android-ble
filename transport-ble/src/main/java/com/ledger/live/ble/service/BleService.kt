@@ -115,8 +115,9 @@ class BleService : Service() {
                             )
                         }
                     }
+
                     is BleServiceStateMachine.BleServiceState.Error -> {
-                        disconnectService(BleServiceEvent.BleDeviceDisconnected(it.error))
+                        notify(BleServiceEvent.BleDeviceError(it.error))
                     }
 
                     BleServiceStateMachine.BleServiceState.CheckingMtu -> {}

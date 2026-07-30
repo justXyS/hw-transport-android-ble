@@ -476,10 +476,17 @@ class BleManager internal constructor(
                                 }
 
                                 is BleServiceEvent.BleDeviceDisconnected -> {
-                                    _bleState.tryEmit(BleState.Disconnected(event.error))
                                     disconnected(event.error)
+                                    _bleState.tryEmit(BleState.Disconnected(event.error))
                                     //连接断开事件
                                     _bleEvents.emit(BleEvent.BleStateChange.Disconnected)
+                                }
+
+                                is BleServiceEvent.BleDeviceError -> {
+                                    //发生错误，取消绑定服务
+                                    if (bluetoothService?.isBound == true) {
+                                        context.unbindService(serviceConnection)
+                                    }
                                 }
 
                                 is BleServiceEvent.SuccessSend -> {

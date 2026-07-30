@@ -9,4 +9,7 @@ sealed class BleServiceEvent {
     data class SendAnswer(val sendId: String, val answer: String): BleServiceEvent()
     data class ErrorSend(val sendId: String, val error: String): BleServiceEvent()
     object BleServiceDisconnected: BleServiceEvent()
+
+    data class BleDeviceError(val error: BleError? = null) : BleServiceEvent()
+
 }
