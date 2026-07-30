@@ -2,15 +2,18 @@ package com.ledger.live.ble
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
@@ -123,6 +126,50 @@ class BleManager internal constructor(
 
     var pollingJob: Job? = null
     var onScanDevicesCallback: ((List<BleDeviceModel>) -> Unit)? = null
+
+
+    //标记是否注册了蓝牙监听
+    private var isBluetoothStateReceiverRegistered = false
+
+    //蓝牙监听器
+    private val bluetoothStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != BluetoothAdapter.ACTION_STATE_CHANGED) return
+            val state = intent.getIntExtra(
+                BluetoothAdapter.EXTRA_STATE,
+                BluetoothAdapter.ERROR,
+            )
+            when (state) {
+                BluetoothAdapter.STATE_OFF -> onBluetoothDisabled()
+            }
+        }
+    }
+
+    /**
+     * 注册蓝牙监听器
+     */
+    private fun registerBluetoothStateReceiver() {
+        Timber.d("registerBluetoothStateReceiver")
+        if (isBluetoothStateReceiverRegistered) return
+        val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(
+                bluetoothStateReceiver,
+                filter,
+                Context.RECEIVER_EXPORTED
+            )
+        } else {
+            context.registerReceiver(
+                bluetoothStateReceiver,
+                filter
+            )
+        }
+        isBluetoothStateReceiverRegistered = true
+    }
+
+    init {
+        registerBluetoothStateReceiver()
+    }
 
     private fun parseScanResult(result: ScanResult): BleDeviceModel? {
         val device = result.device
@@ -607,4 +654,46 @@ class BleManager internal constructor(
             else -> null
 //            else -> throw IllegalStateException("$this is not an known uuid")
         }
+
+    /**
+     * 注销蓝牙监听
+     */
+    private fun unregisterBluetoothStateReceiver() {
+        if (!isBluetoothStateReceiverRegistered) {
+            return
+        }
+        try {
+            context.unregisterReceiver(bluetoothStateReceiver)
+        } catch (e: IllegalArgumentException) {
+            Timber.w(e, "Bluetooth receiver is not registered")
+        } finally {
+            isBluetoothStateReceiverRegistered = false
+        }
+    }
+
+    /**
+     * 蓝牙已关闭
+     */
+    private fun onBluetoothDisabled() {
+        Timber.d("Bluetooth adapter is turning off or already off")
+
+        pollingJob?.cancel()
+        pollingJob = null
+        isScanning = false
+
+        connectingJob?.cancel()
+        connectingJob = null
+
+        disconnectingJob?.cancel()
+        disconnectingJob = null
+
+        if (bluetoothService?.isBound == true) {
+            runCatching {
+                context.unbindService(serviceConnection)
+            }.onFailure {
+                Timber.w(it, "Failed to unbind BleService after Bluetooth was turned off")
+            }
+        }
+    }
+
 }
