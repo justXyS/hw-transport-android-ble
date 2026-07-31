@@ -529,10 +529,25 @@ class BleManager internal constructor(
                                     _bleEvents.emit(BleEvent.BleStateChange.Disconnected)
                                 }
 
+                                //蓝牙相关的错误
                                 is BleServiceEvent.BleDeviceError -> {
-                                    //发生错误，取消绑定服务
-                                    if (bluetoothService?.isBound == true) {
-                                        context.unbindService(serviceConnection)
+                                    when (event.error) {
+                                        //连接超时
+                                        BleError.CONNECTION_TIMEOUT -> {
+                                            connectionCallback?.onConnectionError(event.error)
+                                        }
+
+                                        //未知错误(Ledger 关机或关闭蓝牙开关，会触发该错误,相当于“蓝牙断开”事件)
+                                        BleError.UNKNOWN -> {
+                                            //发生错误，取消绑定服务
+                                            if (bluetoothService?.isBound == true) {
+                                                context.unbindService(serviceConnection)
+                                            }
+                                        }
+
+                                        else -> {
+                                            //do nothing
+                                        }
                                     }
                                 }
 
